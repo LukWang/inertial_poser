@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch>
+
+    <node pkg="inertial_poser" name="pose_optimizer" type="poser" output="screen">
+        <param name="usePosePrior" type="bool" value="false"/>
+        <param name="PoseProjectionWeight" type="double" value="0.001"/>
+        <param name="PoseDeviationWeight" type="double" value="80"/>
+        <param name="OrientationWeight" type="double" value="20"/>
+        <param name="AccelerationWeight" type="double" value="0.05"/>
+    </node>
+    
+</launch>
