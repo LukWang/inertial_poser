@@ -38,35 +38,84 @@ class Optimizer{
             char Proj_dir[] = "/home/luk/PCA/Proj";
             char miu_dir[] = "/home/luk/PCA/mean";
             char eigen_dir[] = "/home/luk/PCA/eigen";
+            char meandata_dir[] = "/home/luk/PCA/meandata";
+            char lower_bound_dir[] = "/home/luk/PCA/lower_bound";
+            char upper_bound_dir[] = "/home/luk/PCA/upper_bound";
             ifstream in(Proj_dir);
-            double data[240];
-            for (int i = 0; i < 30; ++i)
+            {
+              double data[240];
+              for (int i = 0; i < 30; ++i)
                 for(int j = 0; j < 8; ++j)
                 {
                     in >> data[ i*8 + j];
                 }
-            in.close();
-            Eigen::Map<const Eigen::Matrix<double, 30, 8>> proj(data);
-            PCA_proj = proj;
+              in.close();
+              Eigen::Map<const Eigen::Matrix<double, 30, 8>> proj(data);
+              PCA_proj = proj;
+            }
 
             in.open(miu_dir);
-            for(int j = 0; j < 30; ++j)
             {
-                in >> data[j];
+              double data[30];
+              for(int j = 0; j < 30; ++j)
+              {
+                  in >> data[j];
+              }
+              in.close();
+              Eigen::Map<const Eigen::Matrix<double, 30, 1>> miu(data);
+              PCA_miu = miu;
             }
-            in.close();
-            Eigen::Map<const Eigen::Matrix<double, 30, 1>> miu(data);
-            PCA_miu = miu;
+
             in.open(eigen_dir);
-            for(int j = 0; j < 30; ++j)
             {
+              double data[30];
+              for(int j = 0; j < 30; ++j)
+              {
                 in >> data[j];
                 data[j] = sqrt(data[j]);
                 data[j] = 1.0 / data[j];
+              }
+              in.close();
+              Eigen::Map<const Eigen::Matrix<double, 8, 1>> eigen(data);
+              PCA_eigenvalue= eigen;
             }
-            in.close();
-            Eigen::Map<const Eigen::Matrix<double, 8, 1>> eigen(data);
-            PCA_eigenvalue= eigen;
+
+            in.open(upper_bound_dir);
+            {
+              double data[36];
+              for(int j = 0; j < 12; ++j)
+              {
+                in >> data[j*3+1];
+                in >> data[j*3+2];
+                in >> data[j*3];
+              }
+              for(int j = 0; j < 36; ++j)
+              {
+                joint_upper_bound.push_back(data[j]);
+                //std::cout << data[j] << std::endl;
+              }
+              in.close();
+            }
+
+            in.open(lower_bound_dir);
+            {
+              double data[36];
+              for(int j = 0; j < 12; ++j)
+              {
+                in >> data[j*3+1];
+                in >> data[j*3+2];
+                in >> data[j*3];
+              }
+              for(int j = 0; j < 36; ++j)
+              {
+                joint_lower_bound.push_back(data[j]);
+                //cout << data[j] << endl;
+              }
+              in.close();
+            }
+
+
+
 
             in.open("/home/luk/Public/Total Capture/S3/acting1_BlenderZXY_YmZ.bvh");
             int joint_count = 0;
@@ -241,7 +290,7 @@ class Optimizer{
             solver_options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
             //solver_options.sparse_linear_algebra_library_type = ceres::EIGEN_SPARSE;
             //solver_options.num_threads = 4;
-            solver_options.max_solver_time_in_seconds = 0.04;
+            solver_options.max_solver_time_in_seconds = 0.03;
         }
 
 
@@ -351,11 +400,30 @@ class Optimizer{
               problem.AddResidualBlock(priotcost_proj, NULL, spine_joint, lArm_joint, rArm_joint);
               problem.AddResidualBlock(priotcost_deviat, NULL, spine_joint, lArm_joint, rArm_joint);
             }
+
+            if(useConstraint)
+            {
+              for(int i = 0; i < 12; ++i)
+              {
+                problem.SetParameterUpperBound(spine_joint, i, joint_upper_bound[i]);
+                problem.SetParameterLowerBound(spine_joint, i, joint_lower_bound[i]);
+              }
+              for(int i = 0; i < 12; ++i)
+              {
+                problem.SetParameterUpperBound(rArm_joint, i, joint_upper_bound[i+12]);
+                problem.SetParameterLowerBound(rArm_joint, i, joint_lower_bound[i+12]);
+              }
+              for(int i = 0; i < 12; ++i)
+              {
+                problem.SetParameterUpperBound(lArm_joint, i, joint_upper_bound[i+24]);
+                problem.SetParameterLowerBound(lArm_joint, i, joint_lower_bound[i+24]);
+              }
+            }
         }
 
         void solveProblem(Problem &problem){
             Solve(solver_options,&problem, &summary);
-            std::cout << summary.FullReport() << "\n";
+            std::cout << summary.BriefReport() << "\n";
             generateJointMsg();
             //joint_msg.header.stamp = ros::Time::now();
             //joint_publisher.publish(joint_msg);
@@ -416,6 +484,12 @@ class Optimizer{
         {
             joint_msg.header.stamp = ros::Time::now();
             joint_publisher.publish(joint_msg);
+            static tf::TransformBroadcaster br;
+            tf::Transform transform;
+            transform.setOrigin(tf::Vector3(hips_trans[0], hips_trans[1], hips_trans[2]));
+            tf::Quaternion q_tf(0.0, 0.0, 0.0, 1.0);
+            transform.setRotation(q_tf);
+            br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "origin", "world"));
 
         }
 
@@ -502,6 +576,7 @@ class Optimizer{
         void getOptimParam()
         {
           priv_nh.param("usePosePrior",usePosePrior, true);
+          priv_nh.param("useConstraint",useConstraint, true);
           priv_nh.param("PoseProjectionWeight",pos_proj_weight, 0.0001);
           priv_nh.param("PoseDeviationWeight",pos_dev_weight, 60.0);
           priv_nh.param("OrientationWeight",ori_weight, 1.0);
@@ -655,6 +730,11 @@ class Optimizer{
           Eigen::Matrix<double, 3, 1> rHand_pos;
           Eigen::Matrix<double, 3, 1> lHand_pos;
           getPos(hips_pos, rArm_pos, lArm_pos, rHand_pos, lHand_pos);
+          previous_hips_position.clear();
+          previous_rArm_position.clear();
+          previous_lArm_position.clear();
+          previous_rHand_position.clear();
+          previous_lHand_position.clear();
 
           previous_hips_position.push_back(hips_pos);
           previous_rArm_position.push_back(rArm_pos);
@@ -733,6 +813,9 @@ class Optimizer{
         double rArm_joint[12];
         double lArm_joint[12];
 
+        vector<double> joint_upper_bound;
+        vector<double> joint_lower_bound;
+
         vector<Eigen::Matrix<double, 3, 1> > previous_hips_position;
         vector<Eigen::Matrix<double, 3, 1> > previous_lArm_position;
         vector<Eigen::Matrix<double, 3, 1> > previous_rArm_position;
@@ -750,7 +833,7 @@ class Optimizer{
         Eigen::Matrix<double, 30, 1> PCA_miu;
         Eigen::Matrix<double, 8, 1> PCA_eigenvalue;
 
-        bool usePosePrior;
+        bool usePosePrior, useConstraint;
         double pos_proj_weight;
         double pos_dev_weight;
         double ori_weight;

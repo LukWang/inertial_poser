@@ -182,7 +182,7 @@ class Imu_Term {
             //rArm_ori cost
             q_res = (ite_ori * _rArm_offset.cast<T>()).inverse() * _rArm_imu_ori.cast<T>();
             q_res.normalize();
-            cost_imu[1] = res + q_res.x() * q_res.x()
+            cost_imu[1] = q_res.x() * q_res.x()
                 + q_res.y() * q_res.y()
                 + q_res.z() * q_res.z();
             cost_imu[1] *= (T)ori_weight;
@@ -202,7 +202,7 @@ class Imu_Term {
             //rHand_ori cost
             q_res = (ite_ori * _rHand_offset.cast<T>()).inverse() * _rHand_imu_ori.cast<T>();
             q_res.normalize();
-            cost_imu[2] = res + q_res.x() * q_res.x()
+            cost_imu[2] = q_res.x() * q_res.x()
                 + q_res.y() * q_res.y()
                 + q_res.z() * q_res.z();
             cost_imu[2] *= (T)ori_weight;
@@ -235,7 +235,7 @@ class Imu_Term {
             //lArm_oricost
             q_res = (ite_ori * _lArm_offset.cast<T>()).inverse() * _lArm_imu_ori.cast<T>();
             q_res.normalize();
-            cost_imu[3] = res + q_res.x() * q_res.x()
+            cost_imu[3] = q_res.x() * q_res.x()
                   + q_res.y() * q_res.y()
                   + q_res.z() * q_res.z();
             cost_imu[3] *= (T)ori_weight;
@@ -254,7 +254,7 @@ class Imu_Term {
 
             q_res = (ite_ori * _lHand_offset.cast<T>()).inverse() * _lHand_imu_ori.cast<T>();
             q_res.normalize();
-            cost_imu[4] = res + q_res.x() * q_res.x()
+            cost_imu[4] = q_res.x() * q_res.x()
                   + q_res.y() * q_res.y()
                   + q_res.z() * q_res.z();
             cost_imu[4] *= (T)ori_weight;

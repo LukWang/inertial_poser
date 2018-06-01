@@ -75,8 +75,8 @@ public:
         Eigen::Matrix<T, m_row, 1> delta;
         Eigen::Matrix<T, m_col, 1> residual;
         Eigen::Map<const Eigen::Matrix<T, 12, 1> > eigen_spine(spine_joint);
-        Eigen::Map<const Eigen::Matrix<T, 9, 1> > eigen_rArm(rArm_joint);
-        Eigen::Map<const Eigen::Matrix<T, 9, 1> > eigen_lArm(lArm_joint);
+        Eigen::Map<const Eigen::Matrix<T, 12, 1> > eigen_rArm(rArm_joint);
+        Eigen::Map<const Eigen::Matrix<T, 12, 1> > eigen_lArm(lArm_joint);
 
         Eigen::Matrix<T, m_row, 1> theta;
         theta << eigen_spine, eigen_rArm, eigen_lArm;
