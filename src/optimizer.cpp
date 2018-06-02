@@ -1,3 +1,5 @@
+#include <optimizer.h>
+
 #include "ceres/ceres.h"
 #include <Eigen/Dense>
 #include <Eigen/Core>
@@ -12,6 +14,7 @@
 //#include <orientation_term.h>
 //#include <orientation_term.h>
 #include <imu_term.h>
+#include <position_term.h>
 #include <pose_prior_term.h>
 
 #include <tf/transform_listener.h>
@@ -408,10 +411,40 @@ class Optimizer{
               auto maxProb = std::max_element(probs.begin(), probs.end());
               if(*maxProb > human_threshold)
               {
+                auto body_keypoints = keypoints.human_list[maxProb - probs.begin()].body_key_points_with_prob;
                 key_points.clear();
-                for(int i = 0; i < 18; ++i)
-                  key_points.push_back(keypoints.human_list[maxProb - probs.begin()].body_key_points_with_prob[i]);
-                key_points_prob = *maxProb;
+                //keypoints_count = 0;
+                KeyPoints keypoint_element;
+
+                //hips
+                if(body_keypoints[8].prob > 0.0 && body_keypoints[11].prob > 0.0){
+                  keypoint_element.x = (body_keypoints[8].x + body_keypoints[11].x) / 2;
+                  keypoint_element.y = (body_keypoints[8].y + body_keypoints[11].y) / 2;
+                  keypoint_element.p = (body_keypoints[8].prob + body_keypoints[11].prob) / 2;
+                  key_points.push_back(keypoint_element);
+                }
+                else{
+                  keypoint_element.x = 0.0;
+                  keypoint_element.y = 0.0;
+                  keypoint_element.p = 0.0;
+                  key_points.push_back(keypoint_element);
+                }
+                for (int i = 2; i < 8; ++i){
+
+                  if(body_keypoints[i].prob > 0.0){
+                    keypoint_element.x = body_keypoints[i].x;
+                    keypoint_element.y = body_keypoints[i].y;
+                    keypoint_element.p = body_keypoints[i].prob;
+                    key_points.push_back(keypoint_element);
+                  }
+                  else{
+                    keypoint_element.x = 0.0;
+                    keypoint_element.y = 0.0;
+                    keypoint_element.p = 0.0;
+                    key_points.push_back(keypoint_element);
+                  }
+                }
+                //key_points_prob = *maxProb;
                 keypoints_available = true;
                 ROS_INFO("keypoints available");
               }
@@ -437,10 +470,12 @@ class Optimizer{
                                                                                                    rHand_imu_ori, rHand_imu_acc_pre, rHand_offset, previous_rHand_position,
                                                                                                    lHand_imu_ori, lHand_imu_acc_pre, lHand_offset, previous_lHand_position,
                                                                                                    world_to_ref, bone_length, ori_weight, acc_weight));
-            problem.AddResidualBlock(oricost, NULL,hips_trans, hips_joint, spine_joint, rArm_joint, lArm_joint);
+            problem.AddResidualBlock(oricost, NULL, hips_trans, hips_joint, spine_joint, rArm_joint, lArm_joint);
             if(keypoints_available)
             {
               keypoints_available = false;
+              CostFunction* poscost = new AutoDiffCostFunction<Position_Term, 1, 3, 3, 12, 9, 9>(new Position_Term(world_to_ref, bone_length, key_points, camera_ori, camera_trans, pos_weight));
+              problem.AddResidualBlock(poscost, NULL, hips_trans, hips_joint, spine_joint, rArm_joint, lArm_joint);
             }
             if(usePosePrior){
               CostFunction* priotcost_proj = new AutoDiffCostFunction<PoseCost_Project, 1, 12, 9, 9>(new PoseCost_Project(PCA_proj, PCA_miu, pos_proj_weight));
@@ -619,11 +654,30 @@ class Optimizer{
 
                   savePos();
                 }
+                getCameraEx();
                 rate.sleep();
 
                 ros::spinOnce();
 
             }
+        }
+
+        void getCameraEx()
+        {
+          tf::StampedTransform transform;
+          try{
+            tf_listener.lookupTransform("camera_base", "marker_0", ros::Time(0), transform);
+          }
+          catch(tf::TransformException){
+            return;
+          }
+
+          tf::Quaternion q = transform.getRotation();
+          tf::Vector3 cam_pos = transform.getOrigin();
+          Eigen::Quaterniond q_cam;
+          tf::quaternionTFToEigen(q, q_cam);
+          camera_ori = q_cam.toRotationMatrix();
+          camera_trans << cam_pos.x(), cam_pos.y(), cam_pos.z();
         }
 
         void getOptimParam()
@@ -634,6 +688,7 @@ class Optimizer{
           priv_nh.param("PoseDeviationWeight",pos_dev_weight, 60.0);
           priv_nh.param("OrientationWeight",ori_weight, 1.0);
           priv_nh.param("AccelerationWeight",acc_weight, 0.005);
+          priv_nh.param("PositionWeight",pos_weight, 0.01);
           priv_nh.param("HumanThreshold",human_threshold, 0.6);
         }
 
@@ -853,9 +908,13 @@ class Optimizer{
         Eigen::Matrix<double, 3, 1> rHand_imu_acc;
         Eigen::Matrix<double, 3, 1> rHand_imu_acc_pre;
 
-        vector<openpose_ros_msgs::PointWithProb> key_points;
-        double key_points_prob;
+        vector<KeyPoints> key_points;
+        //int keypoints_count;
+        //double key_points_prob;
         double human_threshold;
+
+        Eigen::Matrix3d camera_ori;
+        Eigen::Matrix<double, 3, 1> camera_trans;
         //int keypoints_num;
 
         Eigen::Matrix3d hips_offset;
@@ -904,6 +963,7 @@ class Optimizer{
         double pos_dev_weight;
         double ori_weight;
         double acc_weight;
+        double pos_weight;
 
 
 
