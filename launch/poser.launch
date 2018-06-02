@@ -7,7 +7,6 @@
         <param name="PoseProjectionWeight" type="double" value="0.001"/>
         <param name="PoseDeviationWeight" type="double" value="80"/>
         <param name="OrientationWeight" type="double" value="20"/>
-        <param name="AccelerationWeight" type="double" value="0.0005"/>
+        <param name="AccelerationWeight" type="double" value="0.0001"/>
     </node>
-    #
 </launch>

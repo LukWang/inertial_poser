@@ -162,7 +162,7 @@ class Optimizer{
             for(int i = 0; i < 3; ++i)
               hips_trans[i] = 0.0;
             for(int i = 0; i < 3; ++i)
-              hip_joint[i] = init_joints[i];
+              hips_joint[i] = init_joints[i];
             for(int i = 0; i < 12; ++i)
               spine_joint[i] = init_joints[3 + i];
             for(int i = 0; i < 12; ++i)
@@ -384,16 +384,16 @@ class Optimizer{
             //CostFunction* oricost_hip = new AutoDiffCostFunction<OrientationCost_hip,1, 3>(new OrientationCost_hip(hips_imu_ori, hips_offset, world_to_ref));
             //CostFunction* oricost_lArm = new AutoDiffCostFunction<OrientationCost_lArm,1, 3, 12, 9>(new OrientationCost_lArm(lArm_imu_ori, lArm_offset, world_to_ref));
             //CostFunction* oricost_rArm = new AutoDiffCostFunction<OrientationCost_rArm,1, 3, 12, 9>(new OrientationCost_rArm(rArm_imu_ori, rArm_offset, world_to_ref));
-            //problem.AddResidualBlock(oricost_hip, NULL, hip_joint);
-            //problem.AddResidualBlock(oricost_lArm, NULL, hip_joint, spine_joint, lArm_joint);
-            //problem.AddResidualBlock(oricost_rArm, NULL, hip_joint, spine_joint, rArm_joint);
-            CostFunction* oricost = new AutoDiffCostFunction<Imu_Term, 10, 3, 3, 12, 12, 12>(new Imu_Term(hips_imu_ori, hips_imu_acc_pre, hips_offset, previous_hips_position,
+            //problem.AddResidualBlock(oricost_hip, NULL, hips_joint);
+            //problem.AddResidualBlock(oricost_lArm, NULL, hips_joint, spine_joint, lArm_joint);
+            //problem.AddResidualBlock(oricost_rArm, NULL, hips_joint, spine_joint, rArm_joint);
+            CostFunction* oricost = new AutoDiffCostFunction<Imu_Term, 6, 3, 3, 12, 12, 12>(new Imu_Term(hips_imu_ori, hips_imu_acc_pre, hips_offset, previous_hips_position,
                                                                                                    rArm_imu_ori, rArm_imu_acc_pre, rArm_offset, previous_rArm_position,
                                                                                                    lArm_imu_ori, lArm_imu_acc_pre, lArm_offset, previous_lArm_position,
                                                                                                    rHand_imu_ori, rHand_imu_acc_pre, rHand_offset, previous_rHand_position,
                                                                                                    lHand_imu_ori, lHand_imu_acc_pre, lHand_offset, previous_lHand_position,
                                                                                                    world_to_ref, bone_length, ori_weight, acc_weight));
-            problem.AddResidualBlock(oricost, NULL,hips_trans, hip_joint, spine_joint, rArm_joint, lArm_joint);
+            problem.AddResidualBlock(oricost, NULL,hips_trans, hips_joint, spine_joint, rArm_joint, lArm_joint);
             if(usePosePrior){
               CostFunction* priotcost_proj = new AutoDiffCostFunction<PoseCost_Project, 1, 12, 9, 9>(new PoseCost_Project(PCA_proj, PCA_miu, pos_proj_weight));
               CostFunction* priotcost_deviat = new AutoDiffCostFunction<PoseCost_Deviation, 1, 12, 9, 9>(new PoseCost_Deviation(PCA_proj, PCA_miu, PCA_eigenvalue, pos_dev_weight));
@@ -403,6 +403,11 @@ class Optimizer{
 
             if(useConstraint)
             {
+              for(int i = 0; i < 3; ++i)
+              {
+                problem.SetParameterUpperBound(hips_joint, i, 180.0);
+                problem.SetParameterLowerBound(hips_joint, i, -180.0);
+              }
               for(int i = 0; i < 12; ++i)
               {
                 problem.SetParameterUpperBound(spine_joint, i, joint_upper_bound[i]);
@@ -434,7 +439,7 @@ class Optimizer{
             const double degrees_to_radians(M_PI / 180.0);
             joint_msg.position.clear();
             for(int i = 0; i < 3; ++i)
-              joint_msg.position.push_back(hip_joint[i] * degrees_to_radians);
+              joint_msg.position.push_back(hips_joint[i] * degrees_to_radians);
             for(int i = 0; i < 12; ++i)
               joint_msg.position.push_back(spine_joint[i] * degrees_to_radians);
             for(int i = 0; i < 12; ++i)
@@ -602,7 +607,7 @@ class Optimizer{
           ite_trans = hips_pos;
 
           {
-              EulerAnglesToRotationMatrixZXY(hip_joint, 3, rot);
+              EulerAnglesToRotationMatrixZXY(hips_joint, 3, rot);
               Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > ori(rot);
               ite_ori = ite_ori * ori;
               //Eigen::Matrix<double, 3, 1> ite_trans;
@@ -721,6 +726,8 @@ class Optimizer{
           previous_lHand_position.erase(previous_lHand_position.begin());
           previous_lHand_position.push_back(lHand_pos);
 
+          std::cout << "hips(t-2): " << previous_hips_position[0] << "  hips(t-1): " << previous_hips_position[1] << std::endl;
+
         }
         void init()
         {
@@ -808,7 +815,7 @@ class Optimizer{
         vector<double> init_joints;
 
         double hips_trans[3];
-        double hip_joint[3];
+        double hips_joint[3];
         double spine_joint[12];
         double rArm_joint[12];
         double lArm_joint[12];
