@@ -7,6 +7,8 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/JointState.h>
 
+#include <openpose_ros_msgs/OpenPoseHumanList.h>
+#include <openpose_ros_msgs/PointWithProb.h>
 //#include <orientation_term.h>
 //#include <orientation_term.h>
 #include <imu_term.h>
@@ -285,6 +287,8 @@ class Optimizer{
             lHand_imu_sub = nh.subscribe("/imu_4/imu_stream", 1, &Optimizer::lHand_imu_callback, this);
             rHand_imu_sub = nh.subscribe("/imu_5/imu_stream", 1, &Optimizer::rHand_imu_callback, this);
 
+            human_keypoints_sub = nh.subscribe("/openpose_ros/human_list", 1, &Optimizer::human_keypoints_callback, this);
+
             joint_publisher = nh.advertise<sensor_msgs::JointState>("/arm_ns/joint_states", 1);
 
             solver_options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
@@ -380,6 +384,46 @@ class Optimizer{
             ROS_INFO("lHand_IMU_recved");
         }
 
+        void human_keypoints_callback(openpose_ros_msgs::OpenPoseHumanList keypoints)
+        {
+          int person_num = keypoints.num_humans;
+          vector<double> probs(person_num);
+          if(person_num > 0){
+              for(int person = 0;person < person_num; ++person)
+              {
+                auto body_keypoints = keypoints.human_list[person].body_key_points_with_prob;
+                int count = 0;
+                double prob_sum = 0.0;
+                for(int i = 0; i < body_keypoints.size(); i++)
+                {
+                  if(body_keypoints[i].prob > 0.0)
+                  {
+                    prob_sum += body_keypoints[i].prob;
+                    count ++;
+                  }
+                }
+                probs.push_back(prob_sum/count);
+              }
+
+              auto maxProb = std::max_element(probs.begin(), probs.end());
+              if(*maxProb > human_threshold)
+              {
+                key_points.clear();
+                for(int i = 0; i < 18; ++i)
+                  key_points.push_back(keypoints.human_list[maxProb - probs.begin()].body_key_points_with_prob[i]);
+                key_points_prob = *maxProb;
+                keypoints_available = true;
+                ROS_INFO("keypoints available");
+              }
+              else{
+                ROS_INFO("Keypoints received, detected person abandoned");
+              }
+          }
+          else{
+            ROS_INFO("Keypoints received, no person detected");
+          }
+        }
+
         void buildProblem(Problem &problem){
             //CostFunction* oricost_hip = new AutoDiffCostFunction<OrientationCost_hip,1, 3>(new OrientationCost_hip(hips_imu_ori, hips_offset, world_to_ref));
             //CostFunction* oricost_lArm = new AutoDiffCostFunction<OrientationCost_lArm,1, 3, 12, 9>(new OrientationCost_lArm(lArm_imu_ori, lArm_offset, world_to_ref));
@@ -394,6 +438,10 @@ class Optimizer{
                                                                                                    lHand_imu_ori, lHand_imu_acc_pre, lHand_offset, previous_lHand_position,
                                                                                                    world_to_ref, bone_length, ori_weight, acc_weight));
             problem.AddResidualBlock(oricost, NULL,hips_trans, hips_joint, spine_joint, rArm_joint, lArm_joint);
+            if(keypoints_available)
+            {
+              keypoints_available = false;
+            }
             if(usePosePrior){
               CostFunction* priotcost_proj = new AutoDiffCostFunction<PoseCost_Project, 1, 12, 9, 9>(new PoseCost_Project(PCA_proj, PCA_miu, pos_proj_weight));
               CostFunction* priotcost_deviat = new AutoDiffCostFunction<PoseCost_Deviation, 1, 12, 9, 9>(new PoseCost_Deviation(PCA_proj, PCA_miu, PCA_eigenvalue, pos_dev_weight));
@@ -586,6 +634,7 @@ class Optimizer{
           priv_nh.param("PoseDeviationWeight",pos_dev_weight, 60.0);
           priv_nh.param("OrientationWeight",ori_weight, 1.0);
           priv_nh.param("AccelerationWeight",acc_weight, 0.005);
+          priv_nh.param("HumanThreshold",human_threshold, 0.6);
         }
 
         void getPos(Eigen::Matrix<double, 3, 1> hips_pos,
@@ -762,6 +811,8 @@ class Optimizer{
           lHand_imu_recved = false;
           rHand_imu_recved = false;
 
+          keypoints_available = false;
+
         }
 
 
@@ -774,6 +825,8 @@ class Optimizer{
         ros::Subscriber rArm_imu_sub;
         ros::Subscriber lHand_imu_sub;
         ros::Subscriber rHand_imu_sub;
+
+        ros::Subscriber human_keypoints_sub;
 
 
         ros::Publisher joint_publisher;
@@ -799,6 +852,11 @@ class Optimizer{
         Eigen::Matrix3d rHand_imu_ori;
         Eigen::Matrix<double, 3, 1> rHand_imu_acc;
         Eigen::Matrix<double, 3, 1> rHand_imu_acc_pre;
+
+        vector<openpose_ros_msgs::PointWithProb> key_points;
+        double key_points_prob;
+        double human_threshold;
+        //int keypoints_num;
 
         Eigen::Matrix3d hips_offset;
         Eigen::Matrix3d lArm_offset;
@@ -830,6 +888,7 @@ class Optimizer{
         vector<Eigen::Matrix<double, 3, 1> > previous_rHand_position;
 
         bool hips_imu_recved, lArm_imu_recved, rArm_imu_recved, lHand_imu_recved, rHand_imu_recved;
+        bool keypoints_available;
 
         //Problem problem;
 

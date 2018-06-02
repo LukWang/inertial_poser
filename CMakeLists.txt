@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf
   tf_conversions
+  openpose_ros_msgs
 )
 
 find_package(Ceres REQUIRED)
