@@ -8,6 +8,6 @@
         <param name="PoseDeviationWeight" type="double" value="80"/>
         <param name="OrientationWeight" type="double" value="5"/>
         <param name="AccelerationWeight" type="double" value="0.01"/>
-        <param name="PositionWeight" type="double" value="0.01">
+        <param name="PositionWeight" type="double" value="0.01"/>
     </node>
 </launch>
