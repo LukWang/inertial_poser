@@ -125,7 +125,7 @@ class Imu_Term {
 
             //acc_term_hips
             solved_acc = (ite_trans - (T)2 * _previous_hips_position[1].cast<T>()  + _previous_hips_position[0].cast<T>()) / (T)period;
-            cost_imu[5] = (solved_acc - _hip_imu_acc.cast<T>()).norm() * (T)acc_weight;
+            //cost_imu[5] = (solved_acc - _hip_imu_acc.cast<T>()).norm() * (T)acc_weight;
 
             //cost_ori[0] = (T)0;
 

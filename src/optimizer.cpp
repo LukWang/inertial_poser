@@ -9,6 +9,9 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/JointState.h>
 
+#include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/Pose.h>
+
 #include <openpose_ros_msgs/OpenPoseHumanList.h>
 #include <openpose_ros_msgs/PointWithProb.h>
 //#include <orientation_term.h>
@@ -165,8 +168,6 @@ class Optimizer{
             }
 
             for(int i = 0; i < 3; ++i)
-              hips_trans[i] = 0.0;
-            for(int i = 0; i < 3; ++i)
               hips_joint[i] = init_joints[i];
             for(int i = 0; i < 12; ++i)
               spine_joint[i] = init_joints[3 + i];
@@ -174,6 +175,10 @@ class Optimizer{
               rArm_joint[i] = init_joints[15 + i];
             for(int i = 0; i < 12; ++i)
               lArm_joint[i] = init_joints[27 + i];
+
+            hips_trans[0] = 0;
+            hips_trans[1] = 0.8;
+            hips_trans[2] = 0;
 
 
 
@@ -229,7 +234,7 @@ class Optimizer{
               joint_msg.position.push_back(init_joints[i] * degrees_to_radians);
             }
 
-            double world_to_ref_euler[3] = {0.0, 90.0, 0.0};
+            double world_to_ref_euler[3] = {-90.0, 90.0, 0.0};
             double rot[9];
             EulerAnglesToRotationMatrixZXY(world_to_ref_euler, 3, rot);
             Eigen::Map<const Eigen::Matrix<double, 3, 3> > ori(rot);
@@ -293,11 +298,12 @@ class Optimizer{
             human_keypoints_sub = nh.subscribe("/openpose_ros/human_list", 1, &Optimizer::human_keypoints_callback, this);
 
             joint_publisher = nh.advertise<sensor_msgs::JointState>("/arm_ns/joint_states", 1);
+            image_pose_publisher = nh.advertise<geometry_msgs::PoseArray>("/inertial_poser/pose2d", 1);
 
             solver_options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
             //solver_options.sparse_linear_algebra_library_type = ceres::EIGEN_SPARSE;
             //solver_options.num_threads = 4;
-            solver_options.max_solver_time_in_seconds = 0.03;
+            solver_options.max_solver_time_in_seconds = 0.1;
         }
 
 
@@ -390,7 +396,7 @@ class Optimizer{
         void human_keypoints_callback(openpose_ros_msgs::OpenPoseHumanList keypoints)
         {
           int person_num = keypoints.num_humans;
-          vector<double> probs(person_num);
+          vector<double> probs;
           if(person_num > 0){
               for(int person = 0;person < person_num; ++person)
               {
@@ -411,7 +417,11 @@ class Optimizer{
               auto maxProb = std::max_element(probs.begin(), probs.end());
               if(*maxProb > human_threshold)
               {
-                auto body_keypoints = keypoints.human_list[maxProb - probs.begin()].body_key_points_with_prob;
+                int index = std::distance(probs.begin(), maxProb);
+                std::cout << "person count : " << probs.size() << std::endl;
+                std::cout << "person count : " << person_num << std::endl;
+                std::cout << "person " << index << " is selected" << std::endl;
+                auto body_keypoints = keypoints.human_list[index].body_key_points_with_prob;
                 key_points.clear();
                 //keypoints_count = 0;
                 KeyPoints keypoint_element;
@@ -447,6 +457,16 @@ class Optimizer{
                 //key_points_prob = *maxProb;
                 keypoints_available = true;
                 ROS_INFO("keypoints available");
+                /**
+                for(int i = 0; i < key_points.size(); i++)
+                {
+                  std::cout << "joint " << i << ":" << std::endl;
+                  std::cout << "x: " << key_points[i].x << std::endl;
+                  std::cout << "y: " << key_points[i].y << std::endl;
+                  std::cout << "prob: " << key_points[i].p << std::endl;
+
+                }
+                **/
               }
               else{
                 ROS_INFO("Keypoints received, detected person abandoned");
@@ -464,7 +484,7 @@ class Optimizer{
             //problem.AddResidualBlock(oricost_hip, NULL, hips_joint);
             //problem.AddResidualBlock(oricost_lArm, NULL, hips_joint, spine_joint, lArm_joint);
             //problem.AddResidualBlock(oricost_rArm, NULL, hips_joint, spine_joint, rArm_joint);
-            CostFunction* oricost = new AutoDiffCostFunction<Imu_Term, 6, 3, 3, 12, 12, 12>(new Imu_Term(hips_imu_ori, hips_imu_acc_pre, hips_offset, previous_hips_position,
+            CostFunction* oricost = new AutoDiffCostFunction<Imu_Term, 5, 3, 3, 12, 12, 12>(new Imu_Term(hips_imu_ori, hips_imu_acc_pre, hips_offset, previous_hips_position,
                                                                                                    rArm_imu_ori, rArm_imu_acc_pre, rArm_offset, previous_rArm_position,
                                                                                                    lArm_imu_ori, lArm_imu_acc_pre, lArm_offset, previous_lArm_position,
                                                                                                    rHand_imu_ori, rHand_imu_acc_pre, rHand_offset, previous_rHand_position,
@@ -474,7 +494,7 @@ class Optimizer{
             if(keypoints_available)
             {
               keypoints_available = false;
-              CostFunction* poscost = new AutoDiffCostFunction<Position_Term, 1, 3, 3, 12, 9, 9>(new Position_Term(world_to_ref, bone_length, key_points, camera_ori, camera_trans, pos_weight));
+              CostFunction* poscost = new AutoDiffCostFunction<Position_Term, 7, 3, 3, 12, 12, 12>(new Position_Term(world_to_ref, bone_length, key_points, camera_ori, camera_trans, pos_weight));
               problem.AddResidualBlock(poscost, NULL, hips_trans, hips_joint, spine_joint, rArm_joint, lArm_joint);
             }
             if(usePosePrior){
@@ -572,13 +592,30 @@ class Optimizer{
         {
             joint_msg.header.stamp = ros::Time::now();
             joint_publisher.publish(joint_msg);
+
+            //savePos();
+
             static tf::TransformBroadcaster br;
             tf::Transform transform;
             transform.setOrigin(tf::Vector3(hips_trans[0], hips_trans[1], hips_trans[2]));
             tf::Quaternion q_tf(0.0, 0.0, 0.0, 1.0);
             transform.setRotation(q_tf);
-            br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "origin", "world"));
+            br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "marker_0", "world"));
 
+        }
+
+        void publishKeyPoints()
+        {
+          geometry_msgs::PoseArray joint_pos_array;
+          geometry_msgs::Pose joint_pos;
+          for(int i = 0; i < key_points.size(); ++i)
+          {
+            joint_pos.position.x = key_points[i].x;
+            joint_pos.position.y = key_points[i].y;
+            joint_pos_array.poses.push_back(joint_pos);
+          }
+          joint_pos_array.header.stamp = ros::Time::now();
+          image_pose_publisher.publish(joint_pos_array);
         }
 
         void waitforOffsetCalc()
@@ -643,7 +680,7 @@ class Optimizer{
                   Problem problem;
 
                   start = clock();
-                  //std::cout << "fuck" << hips_imu_ori << std::endl;
+                  //std::cout << "fuck" << hips_imu_ori << std::endl;);
                   buildProblem(problem);
                   build = clock();
                   std::cout << "building problem spends" << (double)(build - start)/CLOCKS_PER_SEC << "s" << std::endl;
@@ -651,6 +688,8 @@ class Optimizer{
                   solve = clock();
                   std::cout << "solving problem spends" << (double)(solve - build)/CLOCKS_PER_SEC << "s" << std::endl;
                   publishJointMsg();
+
+                  //publishKeyPoints();
 
                   savePos();
                 }
@@ -701,9 +740,21 @@ class Optimizer{
 
           Eigen::Matrix3d ite_ori;
           Eigen::Matrix<double ,3, 1> ite_trans;
+
+          Eigen::Matrix<double, 3, 1> cam_space_trans;
+          double img_pos_x;
+          double img_pos_y;
+          //T x_diff, y_diff;
+          double fx = 1068.2054759 / 2;
+          double fy = 1068.22398224 / 2;
+          double cx = 964.1001882846 / 2;
+          double cy = 538.5221553 / 2;
+          geometry_msgs::PoseArray joint_pos_array;
+          geometry_msgs::Pose joint_pos;
           //double world_to_ref[3] = {0.0, 90.0, 0.0};
 
           double rot[9];
+
 
           //EulerAnglesToRotationMatrixZXY(world_to_ref, 3, rot);
           //Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > ori(rot);
@@ -717,6 +768,12 @@ class Optimizer{
               //Eigen::Matrix<double, 3, 1> ite_trans;
               ite_trans += ite_ori * bone_length[0];
           }
+          /***
+          cam_space_trans = camera_trans + camera_ori * ite_trans;
+          joint_pos.position.x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
+          joint_pos.position.y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
+          joint_pos_array.poses.push_back(joint_pos);
+          ***/
 
           for(int i = 0; i < 3; ++i)
           {
@@ -739,8 +796,13 @@ class Optimizer{
 
               ite_trans += ite_ori * bone_length[4];
           }
+          /***
+          cam_space_trans = camera_trans + camera_ori * ite_trans;
+          joint_pos.position.x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
+          joint_pos.position.y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
+          joint_pos_array.poses.push_back(joint_pos);
 
-
+          ***/
 
 
           for(int i = 0; i < 2; ++i)
@@ -751,8 +813,14 @@ class Optimizer{
 
               ite_trans += ite_ori * bone_length[5+i];
           }
-
           rArm_pos = ite_trans;
+          /***
+          cam_space_trans = camera_trans + camera_ori * ite_trans;
+          joint_pos.position.x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
+          joint_pos.position.y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
+          joint_pos_array.poses.push_back(joint_pos);
+
+          ***/
 
           for(int i = 2; i < 4; ++i)
           {
@@ -764,6 +832,12 @@ class Optimizer{
           }
 
           rHand_pos = ite_trans;
+          /***
+          cam_space_trans = camera_trans + camera_ori * ite_trans;
+          joint_pos.position.x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
+          joint_pos.position.y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
+          joint_pos_array.poses.push_back(joint_pos);
+          ***/
 
           //for left arm
           ite_trans = spine_trans;
@@ -775,8 +849,12 @@ class Optimizer{
 
               ite_trans += ite_ori * bone_length[9];
           }
-
-
+          /***
+          cam_space_trans = camera_trans + camera_ori * ite_trans;
+          joint_pos.position.x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
+          joint_pos.position.y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
+          joint_pos_array.poses.push_back(joint_pos);
+          ***/
           for(int i = 0; i < 2; ++i)
           {
               EulerAnglesToRotationMatrixZXY(lArm_joint + i * 3, 3, rot);
@@ -787,6 +865,12 @@ class Optimizer{
           }
 
           lArm_pos = ite_trans;
+          /***
+          cam_space_trans = camera_trans + camera_ori * ite_trans;
+          joint_pos.position.x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
+          joint_pos.position.y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
+          joint_pos_array.poses.push_back(joint_pos);
+          ***/
 
           for(int i = 2; i < 4; ++i)
           {
@@ -798,8 +882,16 @@ class Optimizer{
           }
 
           lHand_pos = ite_trans;
+          /**
 
+          cam_space_trans = camera_trans + camera_ori * ite_trans;
+          joint_pos.position.x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
+          joint_pos.position.y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
+          joint_pos_array.poses.push_back(joint_pos);
 
+          joint_pos_array.header.stamp = ros::Time::now();
+          image_pose_publisher.publish(joint_pos_array);
+          ***/
 
           /***
           static tf::TransformBroadcaster br;
@@ -807,7 +899,7 @@ class Optimizer{
           transform.setOrigin(tf::Vector3(ite_trans(0), ite_trans(1), ite_trans(2)));
           tf::Quaternion q_tf(0.0, 0.0, 0.0, 1.0);
           transform.setRotation(q_tf);
-          br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "test_trans"));
+          br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "marker_0", "test_trans"));
           ***/
         }
 
@@ -830,7 +922,7 @@ class Optimizer{
           previous_lHand_position.erase(previous_lHand_position.begin());
           previous_lHand_position.push_back(lHand_pos);
 
-          std::cout << "hips(t-2): " << previous_hips_position[0] << "  hips(t-1): " << previous_hips_position[1] << std::endl;
+          //std::cout << "hips(t-2): " << previous_hips_position[0] << "  hips(t-1): " << previous_hips_position[1] << std::endl;
 
         }
         void init()
@@ -860,6 +952,8 @@ class Optimizer{
           previous_lHand_position.push_back(lHand_pos);
 
 
+
+
           hips_imu_recved = false;
           lArm_imu_recved = false;
           rArm_imu_recved = false;
@@ -885,6 +979,7 @@ class Optimizer{
 
 
         ros::Publisher joint_publisher;
+        ros::Publisher image_pose_publisher;
 
         tf::TransformListener tf_listener;
 
@@ -977,12 +1072,13 @@ int main(int argc, char** argv)
     Optimizer poseOptimizer;
 
     poseOptimizer.getOptimParam();
+    poseOptimizer.init();
 
     poseOptimizer.waitforOffsetCalc();
 
     //ros::spinOnce()
 
-    poseOptimizer.init();
+    //poseOptimizer.init();
 
     poseOptimizer.run();
 

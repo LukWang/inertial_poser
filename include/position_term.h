@@ -85,21 +85,20 @@ class Position_Term {
 
             T rot[9];
 
-            Eigen::Matrix<T, 3, 1> solved_acc;
-
             ite_trans = hips_trans;
 
             //Eigen::MatrixXd pos = ite_trans.cast<double>();
 
             //position_term_hips
-            if(key_points[0].p > 0.0){
+            //if(key_points[0].p > 0.0)
+            {
               cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
               img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
               img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
               x_diff = img_pos_x - (T)key_points[0].x;
               y_diff = img_pos_y - (T)key_points[0].y;
 
-              pos_cost[0] += (x_diff * x_diff + y_diff * y_diff) * (T)key_points[0].p;
+              pos_cost[0] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[0].p  * (T)pos_weight;
             }
             //cost_ori[0] = (T)0;
 
@@ -141,14 +140,15 @@ class Position_Term {
 
                 ite_trans += ite_ori * _bone_length[5 + i].cast<T>();
 
-                if(key_points[1 + i].p > 0.0){
+                //if(key_points[1 + i].p > 0.0)
+                {
                   cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
                   img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
                   img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
                   x_diff = img_pos_x - (T)key_points[1 + i].x;
                   y_diff = img_pos_y - (T)key_points[1 + i].y;
 
-                  pos_cost[0] += (x_diff * x_diff + y_diff * y_diff) * (T)key_points[1 + i].p;
+                  pos_cost[i+1] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[1 + i].p * (T)pos_weight;
                 }
             }
 
@@ -174,17 +174,19 @@ class Position_Term {
 
                 ite_trans += ite_ori * _bone_length[10+i].cast<T>();
 
-                if(key_points[4 + i].p > 0.0){
+                //if(key_points[4 + i].p > 0.0)
+                {
                   cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
                   img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
                   img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
                   x_diff = img_pos_x - (T)key_points[4 + i].x;
                   y_diff = img_pos_y - (T)key_points[4 + i].y;
 
-                  pos_cost[0] += (x_diff * x_diff + y_diff * y_diff) * (T)key_points[4 + i].p;
+                  pos_cost[i+3] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[3 + i].p * (T)pos_weight;
                 }
             }
-            pos_cost[0] *= (T)pos_weight;
+            //pos_cost[0] *= (T)pos_weight;
+
 
 
             return true;
