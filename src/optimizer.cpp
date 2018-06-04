@@ -49,6 +49,7 @@ class Optimizer{
             char meandata_dir[] = "/home/luk/PCA/meandata";
             char lower_bound_dir[] = "/home/luk/PCA/lower_bound";
             char upper_bound_dir[] = "/home/luk/PCA/upper_bound";
+            char bone_data[] = "/home/luk/PCA/bjh_body";
             ifstream in(Proj_dir);
             {
               double data[240];
@@ -166,6 +167,7 @@ class Optimizer{
                     //cout << data << endl;
                 }
             }
+            in.close();
 
             for(int i = 0; i < 3; ++i)
               hips_joint[i] = init_joints[i];
@@ -240,6 +242,25 @@ class Optimizer{
             Eigen::Map<const Eigen::Matrix<double, 3, 3> > ori(rot);
             world_to_ref = ori.transpose();
 
+
+            in.open(bone_data);
+            {
+
+              for(int i = 0; i < 14; ++i)
+              {
+                double data[3];
+                Eigen::Matrix<double, 3, 1> bone;
+                in >> data[0];
+                in >> data[1];
+                in >> data[2];
+                bone << data[0], data[1], data[2];
+                bone_length.push_back(bone);
+                std::cout << bone_length[i] << std::endl;
+              }
+              in.close();
+            }
+
+/***
             Eigen::Matrix<double, 3, 1> spine_length;
             Eigen::Matrix<double, 3, 1> spine1_length;
             Eigen::Matrix<double, 3, 1> spine2_length;
@@ -288,7 +309,7 @@ class Optimizer{
             bone_length.push_back(upperlArm_length);
             bone_length.push_back(forelArm_length);
             bone_length.push_back(lHand_length);
-
+***/
             hips_imu_sub = nh.subscribe("/imu_1/imu_stream", 1, &Optimizer::hips_imu_callback, this);
             lArm_imu_sub = nh.subscribe("/imu_2/imu_stream", 1, &Optimizer::lArm_imu_callback, this);
             rArm_imu_sub = nh.subscribe("/imu_3/imu_stream", 1, &Optimizer::rArm_imu_callback, this);
@@ -303,7 +324,7 @@ class Optimizer{
             solver_options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
             //solver_options.sparse_linear_algebra_library_type = ceres::EIGEN_SPARSE;
             //solver_options.num_threads = 4;
-            solver_options.max_solver_time_in_seconds = 0.1;
+            solver_options.max_solver_time_in_seconds = 0.035;
         }
 
 
@@ -484,7 +505,7 @@ class Optimizer{
             //problem.AddResidualBlock(oricost_hip, NULL, hips_joint);
             //problem.AddResidualBlock(oricost_lArm, NULL, hips_joint, spine_joint, lArm_joint);
             //problem.AddResidualBlock(oricost_rArm, NULL, hips_joint, spine_joint, rArm_joint);
-            CostFunction* oricost = new AutoDiffCostFunction<Imu_Term, 5, 3, 3, 12, 12, 12>(new Imu_Term(hips_imu_ori, hips_imu_acc_pre, hips_offset, previous_hips_position,
+            CostFunction* oricost = new AutoDiffCostFunction<Imu_Term, 10, 3, 3, 12, 12, 12>(new Imu_Term(hips_imu_ori, hips_imu_acc_pre, hips_offset, previous_hips_position,
                                                                                                    rArm_imu_ori, rArm_imu_acc_pre, rArm_offset, previous_rArm_position,
                                                                                                    lArm_imu_ori, lArm_imu_acc_pre, lArm_offset, previous_lArm_position,
                                                                                                    rHand_imu_ori, rHand_imu_acc_pre, rHand_offset, previous_rHand_position,
@@ -666,6 +687,7 @@ class Optimizer{
               clock_t start, build, solve;
               //double dur;
               ros::Rate rate(60);
+              running = true;
 
               while(ros::ok())
               {
@@ -755,11 +777,22 @@ class Optimizer{
 
           double rot[9];
 
+          double period = 0.05 * 0.05;
+          Eigen::Matrix<double, 3, 1> solved_acc;
+          Eigen::Matrix<double, 3, 1> acc_diff;
+
 
           //EulerAnglesToRotationMatrixZXY(world_to_ref, 3, rot);
           //Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > ori(rot);
           ite_ori = world_to_ref;
           ite_trans = hips_pos;
+
+          if (running){
+            //solved_acc = (ite_trans - 2 * previous_hips_position[1] + previous_hips_position[0]) / period;
+            //acc_diff = solved_acc - hips_imu_acc;
+            //std::cout << "acc_diff: \n" << acc_diff << std::endl;
+          }
+          //std::cout << "acc_diff: "<< acc_diff << std::endl;
 
           {
               EulerAnglesToRotationMatrixZXY(hips_joint, 3, rot);
@@ -1043,6 +1076,7 @@ class Optimizer{
 
         bool hips_imu_recved, lArm_imu_recved, rArm_imu_recved, lHand_imu_recved, rHand_imu_recved;
         bool keypoints_available;
+        bool running;
 
         //Problem problem;
 

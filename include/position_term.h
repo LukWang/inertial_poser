@@ -182,7 +182,7 @@ class Position_Term {
                   x_diff = img_pos_x - (T)key_points[4 + i].x;
                   y_diff = img_pos_y - (T)key_points[4 + i].y;
 
-                  pos_cost[i+3] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[3 + i].p * (T)pos_weight;
+                  pos_cost[i+4] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[4 + i].p * (T)pos_weight;
                 }
             }
             //pos_cost[0] *= (T)pos_weight;
