@@ -126,7 +126,7 @@ class Optimizer{
 
 
 
-            in.open("/home/luk/Public/Total Capture/S3/acting1_BlenderZXY_YmZ.bvh");
+            in.open("/home/luk/Public/Total Capture/S3/acting3_BlenderZXY_YmZ.bvh");
             int joint_count = 0;
             while(1)
             {
@@ -529,8 +529,8 @@ class Optimizer{
             {
               for(int i = 0; i < 3; ++i)
               {
-                problem.SetParameterUpperBound(hips_joint, i, 180.0);
-                problem.SetParameterLowerBound(hips_joint, i, -180.0);
+                //problem.SetParameterUpperBound(hips_joint, i, 180.0);
+                //problem.SetParameterLowerBound(hips_joint, i, -180.0);
               }
               for(int i = 0; i < 12; ++i)
               {
@@ -639,11 +639,14 @@ class Optimizer{
           image_pose_publisher.publish(joint_pos_array);
         }
 
-        void waitforOffsetCalc()
+        void waitforOffsetCalc(bool replayMode)
         {
             pthread_t id1;
-            void* tret;
-            int ret = pthread_create(&id1, NULL, publishJointMsgThread, (void*)this);
+            if(!replayMode){
+
+              void* tret;
+              int ret = pthread_create(&id1, NULL, publishJointMsgThread, (void*)this);
+            }
             while(ros::ok())
             {
                 std::cout << "Enter 'y' to start calculate IMU Offset ..." << std::endl;
@@ -677,9 +680,11 @@ class Optimizer{
                 else
                     std::cout << "IMU not ready, Please try again" << std::endl;
             }
-            ret = pthread_cancel(id1);
-            if(ret)
-                std::cout << "Offset calculate finished" << std::endl;
+            if(!replayMode)
+            int  ret = pthread_cancel(id1);
+            char c;
+            std::cout << "Offset calculate finished, press any key to start tracking" << std::endl;
+            std::cin >> c;
         }
 
         void run()
@@ -1107,8 +1112,13 @@ int main(int argc, char** argv)
 
     poseOptimizer.getOptimParam();
     poseOptimizer.init();
+    if (argc > 1 && argv[1] == "replayMode"){
+      ROS_INFO("Starting Program in replay mode");
+      poseOptimizer.waitforOffsetCalc(true);
+    }
+    else
+      poseOptimizer.waitforOffsetCalc(false);
 
-    poseOptimizer.waitforOffsetCalc();
 
     //ros::spinOnce()
 

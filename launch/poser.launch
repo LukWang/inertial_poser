@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <launch>
-
-    <node pkg="inertial_poser" name="pose_optimizer" type="poser" output="screen">
+    
+    <node pkg="inertial_poser" name="pose_optimizer" type="poser" args="replayMode" output="screen">
         <param name="usePosePrior" type="bool" value="false"/>
         <param name="useConstraint" type="bool" value="true"/>
         <param name="PoseProjectionWeight" type="double" value="0.001"/>
         <param name="PoseDeviationWeight" type="double" value="80"/>
         <param name="OrientationWeight" type="double" value="5"/>
-        <param name="AccelerationWeight" type="double" value="0.001"/>
-        <param name="PositionWeight" type="double" value="0.1"/>
+        <param name="AccelerationWeight" type="double" value="0.01"/>
+        <param name="PositionWeight" type="double" value="0.008"/>
     </node>
 </launch>
