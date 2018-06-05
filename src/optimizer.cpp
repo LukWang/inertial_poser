@@ -516,7 +516,7 @@ class Optimizer{
             {
               keypoints_available = false;
               CostFunction* poscost = new AutoDiffCostFunction<Position_Term, 7, 3, 3, 12, 12, 12>(new Position_Term(world_to_ref, bone_length, key_points, camera_ori, camera_trans, pos_weight));
-              problem.AddResidualBlock(poscost, NULL, hips_trans, hips_joint, spine_joint, rArm_joint, lArm_joint);
+              problem.AddResidualBlock(poscost, new CauchyLoss(150), hips_trans, hips_joint, spine_joint, rArm_joint, lArm_joint);
             }
             if(usePosePrior){
               CostFunction* priotcost_proj = new AutoDiffCostFunction<PoseCost_Project, 1, 12, 9, 9>(new PoseCost_Project(PCA_proj, PCA_miu, pos_proj_weight));
