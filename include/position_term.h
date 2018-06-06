@@ -58,7 +58,7 @@ class Position_Term {
             :_world_to_ref(world_to_ref), _bone_length(bone_length), pos_weight(pos_weight),
              key_points(key_points), camera_ori(camera_ori), camera_trans(camera_trans){}
 
-        template <typename T> bool operator()(const T* const hip_trans, const T* const hip_joint, const T* const spine_joint, const T* const rArm_joint, const T* const lArm_joint, T* pos_cost) const {
+        template <typename T> bool operator()(const T* const hip_trans, const T* const hip_joint, const T* const spine_joint, const T* const rArm_joint, const T* const rElbow_joint, const T* const lArm_joint, const T* const lElbow_joint, T* pos_cost) const {
             Eigen::Matrix<T, 3, 3> ite_ori;
             Eigen::Map<const Eigen::Matrix<T, 3, 1> > hips_trans(hip_trans);
             Eigen::Matrix<T, 3, 1> ite_trans;
@@ -132,9 +132,9 @@ class Position_Term {
                 ite_trans += ite_ori * _bone_length[4].cast<T>();
             }
 
-            for(int i = 0; i < 3; ++i)
+            for(int i = 0; i < 2; ++i)
             {
-                EulerAnglesToRotationMatrixZXY(spine_joint + 3 * 3, 3, rot);
+                EulerAnglesToRotationMatrixZXY(rArm_joint + 3 * i, 3, rot);
                 Eigen::Map<const Eigen::Matrix<T, 3, 3, Eigen::RowMajor> > ori(rot);
                 ite_ori = ite_ori * ori;
 
@@ -151,6 +151,25 @@ class Position_Term {
                   pos_cost[i+1] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[1 + i].p * (T)pos_weight;
                 }
             }
+            //for rWrist
+            {
+              EulerAnglesToRotationMatrixZXY(rElbow_joint, 3, rot);
+              Eigen::Map<const Eigen::Matrix<T, 3, 3, Eigen::RowMajor> > ori(rot);
+              ite_ori = ite_ori * ori;
+
+              ite_trans += ite_ori * _bone_length[7].cast<T>();
+
+              //if(key_points[1 + i].p > 0.0)
+              {
+                cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
+                img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
+                img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
+                x_diff = img_pos_x - (T)key_points[3].x;
+                y_diff = img_pos_y - (T)key_points[3].y;
+
+                pos_cost[3] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[3].p * (T)pos_weight;
+              }
+            }
 
 
 
@@ -166,7 +185,7 @@ class Position_Term {
                 ite_trans += ite_ori * _bone_length[9].cast<T>();
             }
 
-            for(int i = 0; i < 3; ++i)
+            for(int i = 0; i < 2; ++i)
             {
                 EulerAnglesToRotationMatrixZXY(lArm_joint + i * 3, 3, rot);
                 Eigen::Map<const Eigen::Matrix<T, 3, 3, Eigen::RowMajor> > ori(rot);
@@ -184,6 +203,25 @@ class Position_Term {
 
                   pos_cost[i+4] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[4 + i].p * (T)pos_weight;
                 }
+            }
+            //for lWrist
+            {
+              EulerAnglesToRotationMatrixZXY(lElbow_joint, 3, rot);
+              Eigen::Map<const Eigen::Matrix<T, 3, 3, Eigen::RowMajor> > ori(rot);
+              ite_ori = ite_ori * ori;
+
+              ite_trans += ite_ori * _bone_length[12].cast<T>();
+
+              //if(key_points[1 + i].p > 0.0)
+              {
+                cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
+                img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
+                img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
+                x_diff = img_pos_x - (T)key_points[6].x;
+                y_diff = img_pos_y - (T)key_points[6].y;
+
+                pos_cost[6] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[6].p * (T)pos_weight;
+              }
             }
             //pos_cost[0] *= (T)pos_weight;
 
