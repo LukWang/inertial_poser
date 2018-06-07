@@ -126,7 +126,7 @@ class Optimizer{
 
 
 
-            in.open("/home/luk/Public/Total Capture/S3/acting3_BlenderZXY_YmZ.bvh");
+            in.open("/home/luk/Public/Total Capture/M/freestyle1_BlenderZXY_YmZ.bvh");
             int joint_count = 0;
             while(1)
             {
