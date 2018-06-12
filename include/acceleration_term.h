@@ -82,9 +82,9 @@ private:
             //hips_acc
             solved_acc = (ite_trans - (T)2 * _previous_hips_position[1].cast<T>()  + _previous_hips_position[0].cast<T>()) / (T)period;
             acc_diff = solved_acc - _hip_imu_acc.cast<T>();
-            cost_acc[0] = (acc_diff(0,0) * acc_diff(0,0) +
-                          acc_diff(1,0) * acc_diff(1,0) +
-                          acc_diff(2,0) * acc_diff(2,0)) * (T)acc_weight;
+            cost_acc[0] = acc_diff(0,0) * (T)acc_weight;
+            cost_acc[1] = acc_diff(1,0) * (T)acc_weight;
+            cost_acc[2] = acc_diff(2,0) * (T)acc_weight;
 
 
 
@@ -128,9 +128,9 @@ private:
             //rArm_acc cost
             solved_acc = (ite_trans - (T)2 * _previous_rArm_position[1].cast<T>()  + _previous_rArm_position[0].cast<T>()) / (T)period;
             acc_diff = solved_acc - _rArm_imu_acc.cast<T>();
-            cost_acc[1] = (acc_diff(0,0) * acc_diff(0,0) +
-                          acc_diff(1,0) * acc_diff(1,0) +
-                          acc_diff(2,0) * acc_diff(2,0)) * (T)acc_weight;
+            cost_acc[3] = acc_diff(0,0) * (T)acc_weight;
+            cost_acc[4] = acc_diff(1,0) * (T)acc_weight;
+            cost_acc[5] = acc_diff(2,0) * (T)acc_weight;
 
 
             //for right Hand
@@ -152,9 +152,9 @@ private:
             solved_acc = (ite_trans - (T)2 * _previous_rHand_position[1].cast<T>()  + _previous_rHand_position[0].cast<T>()) / (T)period;
             //cost_imu[7] = (solved_acc - _rHand_imu_acc.cast<T>()).norm() * (T)acc_weight;
             acc_diff = solved_acc - _rHand_imu_acc.cast<T>();
-            cost_acc[2] = (acc_diff(0,0) * acc_diff(0,0) +
-                          acc_diff(1,0) * acc_diff(1,0) +
-                          acc_diff(2,0) * acc_diff(2,0)) * (T)acc_weight;
+            cost_acc[6] = acc_diff(0,0) * (T)acc_weight;
+            cost_acc[7] = acc_diff(1,0) * (T)acc_weight;
+            cost_acc[8] = acc_diff(2,0) * (T)acc_weight;
 
             //for left Elbow
             ite_trans = spine_trans;
@@ -179,9 +179,9 @@ private:
             solved_acc = (ite_trans - (T)2 * _previous_lArm_position[1].cast<T>()  + _previous_lArm_position[0].cast<T>()) / (T)period;
             //cost_imu[8] = (solved_acc - _lArm_imu_acc.cast<T>()).norm() * (T)acc_weight;
             acc_diff = solved_acc - _lArm_imu_acc.cast<T>();
-            cost_acc[3] = (acc_diff(0,0) * acc_diff(0,0) +
-                          acc_diff(1,0) * acc_diff(1,0) +
-                          acc_diff(2,0) * acc_diff(2,0)) * (T)acc_weight;
+            cost_acc[9] = acc_diff(0,0) * (T)acc_weight;
+            cost_acc[10] = acc_diff(1,0) * (T)acc_weight;
+            cost_acc[11] = acc_diff(2,0) * (T)acc_weight;
 
             //for left Hand
             {
@@ -201,9 +201,9 @@ private:
             solved_acc = (ite_trans - (T)2 * _previous_lHand_position[1].cast<T>()  + _previous_lHand_position[0].cast<T>()) / (T)period;
             //cost_imu[9] = (solved_acc - _lHand_imu_acc.cast<T>()).norm() * (T)acc_weight;
             acc_diff = solved_acc - _lHand_imu_acc.cast<T>();
-            cost_acc[4] = (acc_diff(0,0) * acc_diff(0,0) +
-                          acc_diff(1,0) * acc_diff(1,0) +
-                          acc_diff(2,0) * acc_diff(2,0)) * (T)acc_weight;
+            cost_acc[12] = acc_diff(0,0) * (T)acc_weight;
+            cost_acc[13] = acc_diff(1,0) * (T)acc_weight;
+            cost_acc[14] = acc_diff(2,0) * (T)acc_weight;
 
             return true;
         }

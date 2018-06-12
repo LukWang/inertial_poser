@@ -38,25 +38,33 @@ class Position_Term {
 
         const vector<Eigen::Matrix<double, 3, 1> > _bone_length;
 
-        const vector<KeyPoints> key_points;
+        const vector<KeyPoints> key_points_prime;
 
-        const Eigen::Matrix<double, 3, 3> camera_ori;
-        const Eigen::Matrix<double, 3, 1> camera_trans;
+        const Eigen::Matrix<double, 3, 3> camera_ori_prime;
+        const Eigen::Matrix<double, 3, 1> camera_trans_prime;
+
+        const vector<KeyPoints> key_points_sec;
+
+        const Eigen::Matrix<double, 3, 3> camera_ori_sec;
+        const Eigen::Matrix<double, 3, 1> camera_trans_sec;
 
         const double pos_weight;
 
-        //const double period = 0.2 * 0.2; //IMU passing ratelHand_imu_acc
 
     public:
         Position_Term (
             const Eigen::Matrix<double, 3, 3>& world_to_ref,
             const vector<Eigen::Matrix<double, 3, 1> >& bone_length,
-            const vector<KeyPoints>& key_points,
-            const Eigen::Matrix<double, 3, 3>& camera_ori,
-            const Eigen::Matrix<double, 3, 1>& camera_trans,
+            const vector<KeyPoints>& key_points_prime,
+            const Eigen::Matrix<double, 3, 3>& camera_ori_prime,
+            const Eigen::Matrix<double, 3, 1>& camera_trans_prime,
+            const vector<KeyPoints>& key_points_sec,
+            const Eigen::Matrix<double, 3, 3>& camera_ori_sec,
+            const Eigen::Matrix<double, 3, 1>& camera_trans_sec,
             const double pos_weight)
             :_world_to_ref(world_to_ref), _bone_length(bone_length), pos_weight(pos_weight),
-             key_points(key_points), camera_ori(camera_ori), camera_trans(camera_trans){}
+             key_points_prime(key_points_prime), camera_ori_prime(camera_ori_prime), camera_trans_prime(camera_trans_prime),
+             key_points_sec(key_points_sec), camera_ori_sec(camera_ori_sec), camera_trans_sec(camera_trans_sec){}
 
         template <typename T> bool operator()(const T* const hip_trans, const T* const hip_joint, const T* const spine_joint, const T* const rArm_joint, const T* const rElbow_joint, const T* const lArm_joint, const T* const lElbow_joint, T* pos_cost) const {
             Eigen::Matrix<T, 3, 3> ite_ori;
@@ -73,10 +81,15 @@ class Position_Term {
             T img_pos_x;
             T img_pos_y;
             T x_diff, y_diff;
-            T fx = (T)(1068.2054759 / 2);
-            T fy = (T)(1068.22398224 / 2);
-            T cx = (T)(964.1001882846 / 2);
-            T cy = (T)(538.5221553 / 2);
+            T fx_prime = (T)(1061.4503092275270 / 2);
+            T fy_prime = (T)(1056.6983606546537 / 2);
+            T cx_prime = (T)(959.19319865266004 / 2);
+            T cy_prime = (T)(578.16194638438651 / 2);
+
+            T fx_sub = (T)(1067.3753755470389 / 2);
+            T fy_sub = (T)(1068.5850173011379 / 2);
+            T cx_sub = (T)(949.40381236547751 / 2);
+            T cy_sub = (T)(549.73736964557440 / 2);
             //printf("I'm here");
 
             //T acc_weight = (T)0.005;
@@ -90,15 +103,25 @@ class Position_Term {
             //Eigen::MatrixXd pos = ite_trans.cast<double>();
 
             //position_term_hips
-            //if(key_points[0].p > 0.0)
+            //if(key_points_prime[0].p > 0.0)
             {
-              cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
-              img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
-              img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
-              x_diff = img_pos_x - (T)key_points[0].x;
-              y_diff = img_pos_y - (T)key_points[0].y;
+              cam_space_trans = camera_trans_prime.cast<T>() + camera_ori_prime.cast<T>() * ite_trans;
+              img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_prime + cx_prime;
+              img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_prime + cy_prime;
+              x_diff = img_pos_x - (T)key_points_prime[0].x;
+              y_diff = img_pos_y - (T)key_points_prime[0].y;
 
-              pos_cost[0] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[0].p  * (T)pos_weight;
+              pos_cost[0] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_prime[0].p  * (T)pos_weight;
+            }
+
+            {
+              cam_space_trans = camera_trans_sec.cast<T>() + camera_ori_sec.cast<T>() * ite_trans;
+              img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_sub + cx_sub;
+              img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_sub + cy_sub;
+              x_diff = img_pos_x - (T)key_points_sec[0].x;
+              y_diff = img_pos_y - (T)key_points_sec[0].y;
+
+              pos_cost[7] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_sec[0].p  * (T)pos_weight;
             }
             //cost_ori[0] = (T)0;
 
@@ -140,15 +163,24 @@ class Position_Term {
 
                 ite_trans += ite_ori * _bone_length[5 + i].cast<T>();
 
-                //if(key_points[1 + i].p > 0.0)
+                //if(key_points_prime[1 + i].p > 0.0)
                 {
-                  cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
-                  img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
-                  img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
-                  x_diff = img_pos_x - (T)key_points[1 + i].x;
-                  y_diff = img_pos_y - (T)key_points[1 + i].y;
+                  cam_space_trans = camera_trans_prime.cast<T>() + camera_ori_prime.cast<T>() * ite_trans;
+                  img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_prime + cx_prime;
+                  img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_prime + cy_prime;
+                  x_diff = img_pos_x - (T)key_points_prime[1 + i].x;
+                  y_diff = img_pos_y - (T)key_points_prime[1 + i].y;
 
-                  pos_cost[i+1] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[1 + i].p * (T)pos_weight;
+                  pos_cost[i+1] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_prime[1 + i].p * (T)pos_weight;
+                }
+                {
+                  cam_space_trans = camera_trans_sec.cast<T>() + camera_ori_sec.cast<T>() * ite_trans;
+                  img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_sub + cx_sub;
+                  img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_sub + cy_sub;
+                  x_diff = img_pos_x - (T)key_points_sec[1 + i].x;
+                  y_diff = img_pos_y - (T)key_points_sec[1 + i].y;
+
+                  pos_cost[i+8] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_sec[1 + i].p  * (T)pos_weight;
                 }
             }
             //for rWrist
@@ -159,15 +191,24 @@ class Position_Term {
 
               ite_trans += ite_ori * _bone_length[7].cast<T>();
 
-              //if(key_points[1 + i].p > 0.0)
+              //if(key_points_prime[1 + i].p > 0.0)
               {
-                cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
-                img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
-                img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
-                x_diff = img_pos_x - (T)key_points[3].x;
-                y_diff = img_pos_y - (T)key_points[3].y;
+                cam_space_trans = camera_trans_prime.cast<T>() + camera_ori_prime.cast<T>() * ite_trans;
+                img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_prime + cx_prime;
+                img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_prime + cy_prime;
+                x_diff = img_pos_x - (T)key_points_prime[3].x;
+                y_diff = img_pos_y - (T)key_points_prime[3].y;
 
-                pos_cost[3] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[3].p * (T)pos_weight;
+                pos_cost[3] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_prime[3].p * (T)pos_weight;
+              }
+              {
+                cam_space_trans = camera_trans_sec.cast<T>() + camera_ori_sec.cast<T>() * ite_trans;
+                img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_sub + cx_sub;
+                img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_sub + cy_sub;
+                x_diff = img_pos_x - (T)key_points_sec[3].x;
+                y_diff = img_pos_y - (T)key_points_sec[3].y;
+
+                pos_cost[10] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_sec[3].p  * (T)pos_weight;
               }
             }
 
@@ -193,15 +234,24 @@ class Position_Term {
 
                 ite_trans += ite_ori * _bone_length[10+i].cast<T>();
 
-                //if(key_points[4 + i].p > 0.0)
+                //if(key_points_prime[4 + i].p > 0.0)
                 {
-                  cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
-                  img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
-                  img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
-                  x_diff = img_pos_x - (T)key_points[4 + i].x;
-                  y_diff = img_pos_y - (T)key_points[4 + i].y;
+                  cam_space_trans = camera_trans_prime.cast<T>() + camera_ori_prime.cast<T>() * ite_trans;
+                  img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_prime + cx_prime;
+                  img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_prime + cy_prime;
+                  x_diff = img_pos_x - (T)key_points_prime[4 + i].x;
+                  y_diff = img_pos_y - (T)key_points_prime[4 + i].y;
 
-                  pos_cost[i+4] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[4 + i].p * (T)pos_weight;
+                  pos_cost[i+4] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_prime[4 + i].p * (T)pos_weight;
+                }
+                {
+                  cam_space_trans = camera_trans_sec.cast<T>() + camera_ori_sec.cast<T>() * ite_trans;
+                  img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_sub + cx_sub;
+                  img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_sub + cy_sub;
+                  x_diff = img_pos_x - (T)key_points_sec[4 + i].x;
+                  y_diff = img_pos_y - (T)key_points_sec[4 + i].y;
+
+                  pos_cost[i+11] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_sec[4 + i].p  * (T)pos_weight;
                 }
             }
             //for lWrist
@@ -212,15 +262,24 @@ class Position_Term {
 
               ite_trans += ite_ori * _bone_length[12].cast<T>();
 
-              //if(key_points[1 + i].p > 0.0)
+              //if(key_points_prime[1 + i].p > 0.0)
               {
-                cam_space_trans = camera_trans.cast<T>() + camera_ori.cast<T>() * ite_trans;
-                img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx + cx;
-                img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy + cy;
-                x_diff = img_pos_x - (T)key_points[6].x;
-                y_diff = img_pos_y - (T)key_points[6].y;
+                cam_space_trans = camera_trans_prime.cast<T>() + camera_ori_prime.cast<T>() * ite_trans;
+                img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_prime + cx_prime;
+                img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_prime + cy_prime;
+                x_diff = img_pos_x - (T)key_points_prime[6].x;
+                y_diff = img_pos_y - (T)key_points_prime[6].y;
 
-                pos_cost[6] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points[6].p * (T)pos_weight;
+                pos_cost[6] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_prime[6].p * (T)pos_weight;
+              }
+              {
+                cam_space_trans = camera_trans_sec.cast<T>() + camera_ori_sec.cast<T>() * ite_trans;
+                img_pos_x = cam_space_trans(0)/cam_space_trans(2) * fx_sub + cx_sub;
+                img_pos_y = cam_space_trans(1)/cam_space_trans(2) * fy_sub + cy_sub;
+                x_diff = img_pos_x - (T)key_points_sec[6].x;
+                y_diff = img_pos_y - (T)key_points_sec[6].y;
+
+                pos_cost[13] = (x_diff * x_diff + y_diff * y_diff) * (T)key_points_sec[6].p  * (T)pos_weight;
               }
             }
             //pos_cost[0] *= (T)pos_weight;
