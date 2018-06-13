@@ -523,7 +523,7 @@ class Optimizer{
 
             if(keypoints_available)
             {
-              keypoints_available = false;
+              //keypoints_available = false;
               CostFunction* pos_cost = new AutoDiffCostFunction<Position_Term, 14, 3, 3, 12, 6, 3, 6, 3>(new Position_Term(world_to_ref, bone_length,
                                                                                                                           key_points_prime, camera_ori_prime, camera_trans_prime,
                                                                                                                           key_points_sec, camera_ori_sec, camera_trans_sec, pos_weight));
